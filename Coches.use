@@ -1,5 +1,9 @@
 model Coches
 
+-----------Enumerados-----------------
+enum TipoRevision{Reparacion, Mantenimiento}
+-----------Fin de enumerados----------
+
 class Clock  -- Este es el modelado del tiempo siempre en todos los modelos
   attributes
     NOW : Integer init = 0 -- POSIX representation starting at 0
@@ -20,6 +24,8 @@ class Clock  -- Este es el modelado del tiempo siempre en todos los modelos
       end
 end
 
+
+
 abstract class ActiveObject -- real-time objects (Todos los objetos que variarán con el tiempo)
   operations
     tick()
@@ -29,3 +35,81 @@ association Time between
   Clock [1] role clock
   ActiveObject [*] role ao ordered
 end
+
+class Ciudad
+attributes
+  nombre: String
+end
+
+associationclass Recorrido between
+  Ciudad [*] role ciudad1
+  Ciudad [*] role ciudad2
+attributes
+  distancia: Integer
+
+  
+class Coche
+attributes
+  matricula: String
+  marca: String
+  fechaMatriculacion : Integer
+  kilometrosRecorridos : Integer --Atributo detivado -> Suma de los kilometros recorridos en todos los viajes. Se actualiza solo
+    
+  garantia : Integer derive : --todo TERMINAR -- Representa el numero de dias restante que tiene garantia
+  necesitaMantenimiento : Boolean derive : --TODO TERMINAR
+  viajeEnCurso : Boolean
+end
+
+associationclass Viaje --Clase de relacion
+attributes
+  fechaSalida : Integer
+  fechaLlegada : Integer --Si el viaje se enuentra en curso, solo tiene fecha de salida, pero no de llegada
+
+end
+
+class Revision
+attributes
+  fechaInicio: Integer
+  fechaFin: Integer
+end
+
+abstract class Taller 
+end
+5º
+class TallerOficial < Taller
+attributes
+  garantia: Integer
+end 
+
+class TallerNoOficial < Taller
+end
+
+----------Asociaciones---------------
+composition TallerOficialEnCiudad between
+  Ciudad [1] role contiene
+  TallerOficial [0..1] role ubicado
+end
+
+composition TallerNoOficialEnCiudad between
+  Ciudad [1] role contiene
+  TallerNoOficial [0..*] role ubicado
+end
+
+composition CocheHaceViaje between
+  Coche [1] role realiza
+  Viaje [0..*] role viaje
+end
+
+association CiudadSalida between
+  Viaje [*] role salida
+  Ciudad [1] role ciudad
+end
+
+association CiudadLlegada between
+  Viaje [*] role llegada
+  Ciudad [1] role ciudad
+end
+
+association CocheEnRevision between --revisar
+  Coche [1] role coche
+  Revision [0..1] role revision
