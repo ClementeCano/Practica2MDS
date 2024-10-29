@@ -55,8 +55,7 @@ attributesrv fc
   velocidad : Integer
 
   operations
-
-  viaje(Recorrido r)
+  viaje(Recorrido r)--hay que cambiar el valor de fecha llegada xcuando acabe
     begin
       viajeEnCurso := true
       recorridoEnCurso := r
