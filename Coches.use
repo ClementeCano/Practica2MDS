@@ -24,16 +24,9 @@ class Clock  -- Este es el modelado del tiempo siempre en todos los modelos
       end
 end
 
-
-
 abstract class ActiveObject -- real-time objects (Todos los objetos que variarán con el tiempo)
   operations
     tick()
-end
-
-association Time between 
-  Clock [1] role clock
-  ActiveObject [*] role ao ordered
 end
 
 class Ciudad
@@ -41,41 +34,58 @@ attributes
   nombre: String
 end
 
-associationclass Recorrido between
-  Ciudad [*] role ciudad1
-  Ciudad [*] role ciudad2
-attributes
-  distancia: Integer
-
-  
-class Coche
-attributes
-  matricula: String
-  marca: String
-  fechaMatriculacion : Integer
-  kilometrosRecorridos : Integer --Atributo detivado -> Suma de los kilometros recorridos en todos los viajes. Se actualiza solo
-    
-  garantia : Integer derive : --todo TERMINAR -- Representa el numero de dias restante que tiene garantia
-  necesitaMantenimiento : Boolean derive : --TODO TERMINAR
-  viajeEnCurso : Boolean
-end
-
-associationclass Viaje --Clase de relacion
+class Viaje < ActiveObject
 attributes
   fechaSalida : Integer
   fechaLlegada : Integer --Si el viaje se enuentra en curso, solo tiene fecha de salida, pero no de llegada
+  position : Integer init = 0
+  
+  operations
+
+  tick()
+    begin
+      if self.position < self.recorrido.distancia then 
+          self.position:=self.position + 1
+      end;
+      if self.position = self.recorrido.distancia then 
+      end;    end
+    pre: self.position != self.recorrido.distancia
+    post: self.position = self.position@pre + 1
+end
+
+class Coche < ActiveObject
+attributesrv fc
+  matricula: String
+  marca: String
+  fechaMatriculacion : Integer
+  kilometrosRecorridos : Integer derive --Atributo detivado -> Suma de los kilometros recorridos en todos los viajes. Se actualiza solo
+    self.viaje->select(v | v.fechaLlegada != null).recorrido->sum(r | r.distancia)
+  garantia : Boolean derive : --todo TERMINAR -- Representa el numero de dias restante que tiene garantia
+      self.fechaMatriculacion < 400 or --TERMINAR COMO TERMINE EN LA MADRE DE DAVID
+      
+  necesitaMantenimiento : Boolean derive : --TODO TERMINAR
+    self.fechaMatriculacion > 400 or self.revision->select(r | r.fechaFin = revision -> fechaFin -> max()) > 100
+    
+  viajeEnCurso : Boolean
+
+  operations
+
+  tick()
+    begin
+      if self.TUPUTAMADREGUARRA COMO LA QUE MAS  (else me chingo a su madre)
+
 
 end
 
-class Revision
+class Revision < ActiveObject
 attributes
   fechaInicio: Integer
   fechaFin: Integer
+  tipoRevision : TipoRevision
 end
 
 abstract class Taller 
 end
-5º
 class TallerOficial < Taller
 attributes
   garantia: Integer
@@ -85,31 +95,75 @@ class TallerNoOficial < Taller
 end
 
 ----------Asociaciones---------------
+
+association Time between 
+  Clock [1] role clock
+  ActiveObject [*] role ao ordered
+end
+
 composition TallerOficialEnCiudad between
-  Ciudad [1] role contiene
-  TallerOficial [0..1] role ubicado
+  Ciudad [1] role ciudadOficial
+  TallerOficial [0..1] role tallerOficial
 end
 
 composition TallerNoOficialEnCiudad between
-  Ciudad [1] role contiene
-  TallerNoOficial [0..*] role ubicado
+  Ciudad [1] role ciudadNoOficial
+  TallerNoOficial [0..*] role tallerNoOficial
 end
 
-composition CocheHaceViaje between
-  Coche [1] role realiza
-  Viaje [0..*] role viaje
+association Viajar between
+  Coche [*] role vehiculo
+  Viaje [*] role viaje
 end
 
-association CiudadSalida between
-  Viaje [*] role salida
-  Ciudad [1] role ciudad
+association RealizarRevision between 
+  Coche [*] role coche
+  Revision [*] role revision
 end
 
-association CiudadLlegada between
-  Viaje [*] role llegada
-  Ciudad [1] role ciudad
+association CocheEnTaller between 
+  Coche[*] role cocheAveriado
+  Taller[*] role tallerReparador
+end
+  
+association TallerDeRevision between
+  Taller[1] role taller
+  Revision[*] role revisiones
 end
 
-association CocheEnRevision between --revisar
-  Coche [1] role coche
-  Revision [0..1] role revision
+association RecorridoDelViaje between
+  Viaje[*] roles viajes
+  Recorrido[1] role recorrido
+end
+
+----------Fin Asoc TallerRevision betweeniaciones---------------
+----------Clase de Asociaciones---------------
+
+associationclass Recorrido between
+  Ciudad [*] role ciudad1
+  Ciudad [*] role ciudad2
+attributes
+  distancia: Integer
+
+----------Fin Clase de Asociaciones---------------
+
+
+-------------------Invariantes--------------------
+constraints
+
+context Recorrido
+  --*El coche realiza un recorrido siempre entre dos ciudades
+  inv CiudadOrigenDistintaCiuddadDestino : 
+    Recorrido.allInstances()->forAll(
+      c1, c2 | c1 <> c2 implies c1.nombre <> c2.nombre 
+    )
+
+context Ciudad
+  inv CiudadesAlMenos5Km :
+    self.recorrido->select(r | r.distancia < 5).size() = 0
+
+context Revision
+  inv RevisionDespuesDeMatriculacion :
+    self.fechaInicio < self.coche
+-------------------Fin Invariantes--------------------
+
