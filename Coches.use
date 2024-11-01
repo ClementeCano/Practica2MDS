@@ -175,51 +175,73 @@ attributes
 constraints
 
 context Recorrido
-  -- El coche realiza un recorrido siempre entre dos ciudades
+  -- (3) El coche realiza un recorrido siempre entre dos ciudades
   inv CiudadOrigenDistintaCiuddadDestino : 
     Recorrido.allInstances()->forAll(
       c1, c2 | c1 <> c2 implies c1.nombre <> c2.nombre 
     )
 
 context Ciudad
-  -- Cada ciudad está separada al menos 5Km una de otra
+  -- (1) Cada ciudad está separada al menos 5Km una de otra
   inv CiudadesAlMenos5Km :
     --Ciudad.allInstances()->forAll(c1, c2 | )
     self.recorrido->select(r | r.distancia < 5).size() = 0
 
 context Revision
-  --  Todas las revisiones deben tener lugar después de que el coche se matricule
+  -- (4) Todas las revisiones deben tener lugar después de que el coche se matricule
   inv RevisionDespuesDeMatriculacion :
     self.fechaInicio > self.coche.fechaMatriculacion
 
 context Coche 
-  -- Si el coche ha realizado un viaje desde la ciudad A a B, el proximo viaje debe empezar en B
-  inv viajeEmpiezaDondeAcaboViajeAnterior : --!REVISAR
-    let viajesOrdenados = self.viaje->sortedBy(v | v.fechaSalida) in 
-      Sequence{1 .. viajesOrdenados->size() - 1}->forAll(i | 
-        viajesOrdenados->at(i).recorrido.ciudad2 = viajesOrdenados->at(i + 1).recorrido.ciudad1)
-      
-  -- Un coche se debe someter a una revisión, como máximo, en un momento dado. 
+  -- (5) Un coche se debe someter a una revisión, como máximo, en un momento dado. 
   inv CocheSoloUnaRevisionAlMismoTiempo :
     self.revision->select(r1, r2 | r1.fechaInicio < r2.fechaInicio and r1.fechaFin > r2.fechaInicio).size() = 0
   
-  -- Si un coche está siendo sometido a una revisión, entonces el coche debe encontrarse en la misma ciudad donde está el taller.
+  -- (7) Si un coche está siendo sometido a una revisión, entonces el coche debe encontrarse en la misma ciudad donde está el taller.
   inv CocheEnCiudadDelTaller : 
-    let revisionActual = self.revision->select(r | r.fechaInicio <= Clock.NOW and r.fechaFin > Clock.NOW) in 
-      revisionActual->forAll(r | r.taller.ciudadOficial.nombre = self.viaje->select(v | v.fechaLlegada = null).recorrido.ciudad1.nombre)
-  
-  -- Si el coche está realizando actualmente algún viaje, dicho viaje únicamente tendrá fecha de salida, pero no de llegada.  
+    let revisionActual = self.revision->select(r | r.fechaInicio <= Clock.NOW and r.fechaFin > Clock.NOW) 
+      in revisionActual->forAll(r | r.taller.ciudadOficial.nombre = self.viaje->select(v | v.fechaLlegada = null).recorrido.ciudad1.nombre)
+  end
+
+      --? OTRA VERSIÓN QUE HACE QUE EL CODIGO NO SE MUESTRE RARO (NO UTILIZA LET)--
+  -- (7) Si un coche está siendo sometido a una revisión, entonces el coche debe encontrarse en la misma ciudad donde está el taller.
+  --inv CocheEnCiudadDelTaller : 
+  --  self.revision->select(r | r.fechaInicio <= Clock.NOW and r.fechaFin > Clock.NOW)->forAll(r | 
+  --   r.taller.ciudadOficial.nombre = self.viaje->select(v | v.fechaLlegada = null).recorrido.ciudad1.nombre)
+      --?----------------------------------------------------------
+
+  -- (8) Si el coche está realizando actualmente algún viaje, dicho viaje únicamente tendrá fecha de salida, pero no de llegada.  
   inv CocheEnViajeSinFechaLlegada :
     self.viaje->select(v | v.fechaLlegada = null).size() <= 1
 
-  -- Si el coche ha completado al menos un viaje y no se encuentra viajando, entonces debe encontrarse en la ciudad a la que llegó en su último viaje
+  -- (10) Si el coche ha completado al menos un viaje y no se encuentra viajando, entonces debe encontrarse en la ciudad a la que llegó en su último viaje
   inv CocheEnCiudadDelUltViaje : --! Hay que revisar para hacerlo con el estado
     self.viaje->select(v | v.fechaLlegada != null)->notEmpty() and self.viaje->select(v | v.fechaLlegada = null)->isEmpty() implies
     self.viaje->sortedBy(v | v.fechaLlegada)->last().recorrido.ciudad2 = self.viaje->select(v | v.fechaLlegada = null).recorrido.ciudad1
+      
+      --?----------------------------------------------------------
+  -- (10) Si el coche ha completado al menos un viaje y no se encuentra viajando, entonces debe encontrarse en la ciudad a la que llegó en su último viaje
+  inv CocheEnCiudadDelUltViaje : 
+    self.viaje->select(v | v.fechaLlegada != null)->notEmpty() and not self.viajeEnCurso implies
+    self.viaje->sortedBy(v | v.fechaLlegada)->last().recorrido.ciudad2 = self.viaje->select(v | v.fechaLlegada != null)->sortedBy(v | v.fechaLlegada)->last().recorrido.ciudad2
+      --?----------------------------------------------------------
 
-  -- Un coche no puede realizar dos viajes a la vez
+  -- (11) Un coche no puede realizar dos viajes a la vez
   inv CocheNoPuedeRealizarDosViajes :
     self.viaje->select(v | v.fechaLlegada = null).size() <= 1
     
-  ------------------Fin Invariantes--------------------
---CLEMENTE Y DAVID SE MOLAN MUCHO
+  -- (12) Si el coche ha realizado un viaje desde la ciudad A a B, el proximo viaje debe empezar en B
+  inv viajeEmpiezaDondeAcaboViajeAnterior : --!REVISAR
+    let viajesOrdenados = self.viaje -> sortedBy(v | v.fechaSalida) 
+    in Sequence{1..viajesOrdenados -> size() - 1}->forAll(i | viajesOrdenados->at(i).recorrido.ciudad2 = viajesOrdenados->at(i + 1).recorrido.ciudad1)
+
+      --? OTRA VERSIÓN QUE HACE QUE EL CODIGO NO SE MUESTRE RARO (NO UTILIZA LET)--
+  -- (12) Si el coche ha realizado un viaje desde la ciudad A a B, el proximo viaje debe empezar en B
+  --inv viajeEmpiezaDondeAcaboViajeAnterior :
+  --  Sequence{1..self.viaje->size() - 1}->forAll(i | 
+  --    self.viaje->sortedBy(v | v.fechaSalida)->at(i).recorrido.ciudad2 = 
+  --    self.viaje->sortedBy(v | v.fechaSalida)->at(i + 1).recorrido.ciudad1
+  --  )
+      --?----------------------------------------------------------
+
+
