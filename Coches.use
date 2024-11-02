@@ -26,7 +26,7 @@ end
 
 abstract class ActiveObject -- real-time objects (Todos los objetos que variarán con el tiempo)
   operations
-    tick()
+    tick() begin end
 end
 
 class Ciudad
@@ -41,7 +41,7 @@ attributes
 end
 
 class Coche < ActiveObject
-attributesrv fc
+attributes
   matricula: String
   marca: String
   fechaMatriculacion : Integer
