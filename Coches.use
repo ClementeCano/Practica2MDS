@@ -24,16 +24,9 @@ class Clock  -- Este es el modelado del tiempo siempre en todos los modelos
       end
 end
 
-
-
 abstract class ActiveObject -- real-time objects (Todos los objetos que variarán con el tiempo)
   operations
-    tick()
-end
-
-association Time between 
-  Clock [1] role clock
-  ActiveObject [*] role ao ordered
+    tick() begin end
 end
 
 class Ciudad
@@ -41,41 +34,86 @@ attributes
   nombre: String
 end
 
-associationclass Recorrido between
-  Ciudad [*] role ciudad1
-  Ciudad [*] role ciudad2
+class Viaje
 attributes
-  distancia: Integer
+  fechaSalida : Integer
+  fechaLlegada : Integer 
+end
 
-  
-class Coche
+class Coche < ActiveObject
 attributes
   matricula: String
   marca: String
   fechaMatriculacion : Integer
-  kilometrosRecorridos : Integer --Atributo detivado -> Suma de los kilometros recorridos en todos los viajes. Se actualiza solo
+  kilometrosRecorridos : Integer derive --Atributo detivado -> Suma de los kilometros recorridos en todos los viajes. Se actualiza solo
+    self.viaje->select(v | v.fechaLlegada != null).recorrido->sum(r | r.distancia)
+  garantia : Boolean  -- Representa si el coche esta en garantia o no
+  necesitaMantenimiento : Boolean 
+  viajeEnCurso : Boolean init = false
+  recorridoEnCurso : Recorrido
+  kilometrosViaje : Integer init = 0
+  velocidad : Integer
+
+  operations
+  viaje(Recorrido r)--hay que cambiar el valor de fecha llegada xcuando acabe
+    begin
+      viajeEnCurso := true
+      recorridoEnCurso := r
+    end
     
-  garantia : Integer derive : --todo TERMINAR -- Representa el numero de dias restante que tiene garantia
-  necesitaMantenimiento : Boolean derive : --TODO TERMINAR
-  viajeEnCurso : Boolean
-end
+  avanzar()
+    begin
+      
+      if self.kilometrosViaje + self.velocidad > self.recorridoEnCurso.distancia then
+        self.kilometrosRecorridos := self.kilometrosRecorridos + (self.recorridoEnCurso.distancia - self.kilometrosViaje)
+        self.kilometrosViaje := self.recorridoEnCurso.distancia
+      end;
+      else then
+        self.kilometrosViaje := self.kilometrosViaje + self.velocidad
+        self.kilometrosRecorridos := self.kilometrosRecorridos + self.velocidad
+      end;
+    end
 
-associationclass Viaje --Clase de relacion
-attributes
-  fechaSalida : Integer
-  fechaLlegada : Integer --Si el viaje se enuentra en curso, solo tiene fecha de salida, pero no de llegada
+    pre: self.kilometrosViaje < self.recorridoEnCurso.distancia
+    post: self.kilometrosViaje = self.kilometrosViaje@pre + self.velocidad 
+          or self.kilometrosViaje = self.recorridoEnCurso.distancia
 
+  tick()
+    declare ultima_rev: self.revision->select(r | r.fechaFin = revision -> fechaFin -> max());
+    declare ultimo_mantenimiento: self.revision->select(r | r.tipo = 'Mantenimiento')->sortedBy(r | r.fechaFin)->last()
+    begin
+
+      if self.viajeEnCurso then 
+        self.avanzar()
+      end;
+      
+      -- el coche estara en garantia si han pasado menos de 4 años desde que se matriculó o si le dura la garantia de la ultima revision
+      if (Clock.Now - self.fechaMatriculacion < 400) or((type(ultima_rev.taller) = TallerOficial) and (ultima_rev.taller.garantia + ultima_rev.fechaFin) > Clock.NOW) then
+        self.garantia := true
+      end;
+      else then 
+        self.garantia := false
+      end;
+
+      -- el coche necesitará mantenimiento si han pasado mas de 4 años desde que se matriculó y si ha pasado mas de 1 año desde la ultima revision
+      if (Clock.NOW - self.fechaMatriculacion > 400) and (Clock.NOW - ultimo_mantenimiento.fechaFin > 100) then
+        self.necesitaMantenimiento := true
+      end;
+      else then 
+        self.necesitaMantenimiento := false
+      end;
 end
 
 class Revision
 attributes
   fechaInicio: Integer
   fechaFin: Integer
+  tipoRevision : TipoRevision
+
 end
 
 abstract class Taller 
 end
-5º
 class TallerOficial < Taller
 attributes
   garantia: Integer
@@ -85,31 +123,125 @@ class TallerNoOficial < Taller
 end
 
 ----------Asociaciones---------------
+
+association Time between 
+  Clock[1] role clock
+  ActiveObject[*] role ao ordered
+end
+
 composition TallerOficialEnCiudad between
-  Ciudad [1] role contiene
-  TallerOficial [0..1] role ubicado
+  Ciudad[1] role ciudadOficial
+  TallerOficial[0..1] role tallerOficial
 end
 
 composition TallerNoOficialEnCiudad between
-  Ciudad [1] role contiene
-  TallerNoOficial [0..*] role ubicado
+  Ciudad[1] role ciudadNoOficial
+  TallerNoOficial[0..*] role tallerNoOficial
 end
 
-composition CocheHaceViaje between
-  Coche [1] role realiza
-  Viaje [0..*] role viaje
+association Viajar between
+  Coche[*] role vehiculo
+  Viaje[*] role viaje
 end
 
-association CiudadSalida between
-  Viaje [*] role salida
-  Ciudad [1] role ciudad
+composition RevisionCoche between 
+  Coche[1] role coche
+  Revision[*] role revision
+end
+  
+association TallerDeRevision between
+  Taller[1] role taller
+  Revision[*] role revisiones
 end
 
-association CiudadLlegada between
-  Viaje [*] role llegada
-  Ciudad [1] role ciudad
+association RecorridoDelViaje between
+  Viaje[*] roles viajes
+  Recorrido[1] role recorrido
 end
 
-association CocheEnRevision between --revisar
-  Coche [1] role coche
-  Revision [0..1] role revision
+----------Fin Asociaciones---------------
+----------Clase de Asociaciones---------------
+
+associationclass Recorrido between
+  Ciudad [*] role ciudad1
+  Ciudad [*] role ciudad2
+attributes
+  distancia: Integer
+
+----------Fin Clase de Asociaciones---------------
+
+
+-------------------Invariantes--------------------
+constraints
+
+context Recorrido
+  -- (3) El coche realiza un recorrido siempre entre dos ciudades
+  inv CiudadOrigenDistintaCiuddadDestino : 
+    Recorrido.allInstances()->forAll(
+      c1, c2 | c1 <> c2 implies c1.nombre <> c2.nombre 
+    )
+
+context Ciudad
+  -- (1) Cada ciudad está separada al menos 5Km una de otra
+  inv CiudadesAlMenos5Km :
+    --Ciudad.allInstances()->forAll(c1, c2 | )
+    self.recorrido->select(r | r.distancia < 5).size() = 0
+
+context Revision
+  -- (4) Todas las revisiones deben tener lugar después de que el coche se matricule
+  inv RevisionDespuesDeMatriculacion :
+    self.fechaInicio > self.coche.fechaMatriculacion
+
+context Coche 
+  -- (5) Un coche se debe someter a una revisión, como máximo, en un momento dado. 
+  inv CocheSoloUnaRevisionAlMismoTiempo :
+    self.revision->select(r1, r2 | r1.fechaInicio < r2.fechaInicio and r1.fechaFin > r2.fechaInicio).size() = 0
+  
+  -- (7) Si un coche está siendo sometido a una revisión, entonces el coche debe encontrarse en la misma ciudad donde está el taller.
+  inv CocheEnCiudadDelTaller : 
+    let revisionActual = self.revision->select(r | r.fechaInicio <= Clock.NOW and r.fechaFin > Clock.NOW) 
+      in revisionActual->forAll(r | r.taller.ciudadOficial.nombre = self.viaje->select(v | v.fechaLlegada = null).recorrido.ciudad1.nombre)
+  end
+
+      --? OTRA VERSIÓN QUE HACE QUE EL CODIGO NO SE MUESTRE RARO (NO UTILIZA LET)--
+  -- (7) Si un coche está siendo sometido a una revisión, entonces el coche debe encontrarse en la misma ciudad donde está el taller.
+  --inv CocheEnCiudadDelTaller : 
+  --  self.revision->select(r | r.fechaInicio <= Clock.NOW and r.fechaFin > Clock.NOW)->forAll(r | 
+  --   r.taller.ciudadOficial.nombre = self.viaje->select(v | v.fechaLlegada = null).recorrido.ciudad1.nombre)
+      --?----------------------------------------------------------
+
+  -- (8) Si el coche está realizando actualmente algún viaje, dicho viaje únicamente tendrá fecha de salida, pero no de llegada.  
+  inv CocheEnViajeSinFechaLlegada :
+    self.viaje->select(v | v.fechaLlegada = null).size() <= 1
+
+  -- (10) Si el coche ha completado al menos un viaje y no se encuentra viajando, entonces debe encontrarse en la ciudad a la que llegó en su último viaje
+  inv CocheEnCiudadDelUltViaje : --! Hay que revisar para hacerlo con el estado
+    self.viaje->select(v | v.fechaLlegada != null)->notEmpty() and self.viaje->select(v | v.fechaLlegada = null)->isEmpty() implies
+    self.viaje->sortedBy(v | v.fechaLlegada)->last().recorrido.ciudad2 = self.viaje->select(v | v.fechaLlegada = null).recorrido.ciudad1
+      
+      --?----------------------------------------------------------
+  -- (10) Si el coche ha completado al menos un viaje y no se encuentra viajando, entonces debe encontrarse en la ciudad a la que llegó en su último viaje
+  inv CocheEnCiudadDelUltViaje : 
+    self.viaje->select(v | v.fechaLlegada != null)->notEmpty() and not self.viajeEnCurso implies
+    self.viaje->sortedBy(v | v.fechaLlegada)->last().recorrido.ciudad2 = self.viaje->select(v | v.fechaLlegada != null)->sortedBy(v | v.fechaLlegada)->last().recorrido.ciudad2
+      --?----------------------------------------------------------
+
+  -- (11) Un coche no puede realizar dos viajes a la vez
+  inv CocheNoPuedeRealizarDosViajes :
+    self.viaje->select(v | v.fechaLlegada = null).size() <= 1
+    
+  -- (12) Si el coche ha realizado un viaje desde la ciudad A a B, el proximo viaje debe empezar en B
+  inv viajeEmpiezaDondeAcaboViajeAnterior : --!REVISAR
+    let viajesOrdenados = self.viaje -> sortedBy(v | v.fechaSalida) 
+    in Sequence{1..viajesOrdenados -> size() - 1}->forAll(i | viajesOrdenados->at(i).recorrido.ciudad2 = viajesOrdenados->at(i + 1).recorrido.ciudad1)
+
+      --? OTRA VERSIÓN QUE HACE QUE EL CODIGO NO SE MUESTRE RARO (NO UTILIZA LET)--
+  -- (12) Si el coche ha realizado un viaje desde la ciudad A a B, el proximo viaje debe empezar en B
+  --inv viajeEmpiezaDondeAcaboViajeAnterior :
+  --  Sequence{1..self.viaje->size() - 1}->forAll(i | 
+  --    self.viaje->sortedBy(v | v.fechaSalida)->at(i).recorrido.ciudad2 = 
+  --    self.viaje->sortedBy(v | v.fechaSalida)->at(i + 1).recorrido.ciudad1
+  --  )
+      --?----------------------------------------------------------
+
+
