@@ -19,3 +19,4 @@ reset
 
 !insert(Malaga,Sevilla) into Recorrido --Recorrido1 --!REVISAR RELACION RECORRIDO (CLASE DE ASOCIACION)
 !insert(Viaje1,Coche1) into Viajar --Viaje1
+
