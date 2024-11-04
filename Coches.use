@@ -12,15 +12,15 @@ class Clock  -- Este es el modelado del tiempo siempre en todos los modelos
     tick() 
       begin
         self.NOW := self.NOW + self.resolution
-        for o in self.ao do
+        for o in (self.ao) do
           o.tick()
-        end;
+        end
       end
     run (n:Integer)
       begin
         for i in Sequence{1..n} do
           self.tick()
-        end;
+        end
       end
 end
 
@@ -63,7 +63,7 @@ attributes
       recorridoEnCurso := r
       kilometrosViaje := 0
       
-      v.fechaInicio = Cock.NOW
+      v.fechaInicio = Clock.NOW
       insert(self, v) into Viajar;
       insert(r, v) into RecorridoDelViaje;
 
@@ -74,7 +74,7 @@ attributes
     
   avanzar()
     begin
-      if self.kilometrosViaje + self.velocidad > self.recorridoEnCurso.distancia then
+      if self.kilometrosViaje + self.velocidad >= self.recorridoEnCurso.distancia then
         self.kilometrosRecorridos := self.kilometrosRecorridos + (self.recorridoEnCurso.distancia - self.kilometrosViaje)
         self.kilometrosViaje := self.recorridoEnCurso.distancia
         
@@ -88,6 +88,8 @@ attributes
         insert(viaje.recorrido, viajeMod) into RecorridoDelViaje;
 
         insert(self, viaje.recorrido.ciudad2) into UbicacionCoche;
+        
+        self.viajeEnCurso := false
       end;
 
       else then
@@ -198,27 +200,60 @@ attributes
 
 ----------Fin Clase de Asociaciones---------------
 
+---------- Maquina de estados ---------------
+
+  statemachines
+    psm Coche
+      states
+        s: initial 
+        Reposo [self.viajeEnCurso = false]
+        Viajando [self.viajeEnCurso = true]
+        -- EnRevision [self.necesitaMantenimiento = true]    
+      transitions
+        s -> Reposo
+
+        Reposo -> Reposo { [self.viajeEnCurso = false] tick() } --* El coche se encuentra en una ciudad. En el siguiente tick sigue en la misma ciudad.
+        Reposo -> Viajando { [self.viajeEnCurso = false] viaje() } --* El coche sale de la ciudad y empieza un viaje.
+        --Reposo -> EnRevision { [not self.viajeEnCurso and not self.mantenimiento] put() }
+
+        --Viajando -> Viajando { [self.viajeEnCurso = true] viaje() } 
+        Viajando -> Viajando { [self.viajeEnCurso = true and not (self.kilometrosViaje + self.velocidad >= self.recorridoEnCurso.distancia)] avanzar() } 
+        Viajando -> Reposo { [self.viajeEnCurso = true and self.kilometrosViaje + self.velocidad >= self.recorridoEnCurso.distancia] avanzar() }
+
+
+        Empty -> Full { [self.capacidad=1] put() }
+        -- Empty -> Empty { size() }   -- Query operations do not change the object state
+        -- Normal -> Normal { size() } -- Query operations do not change the object state
+        -- Full -> Full { size() }   -- Query operations do not change the object state
+        Viajando -> Reposo { [self.capacidad=1] get() }
+        Full -> Normal { [self.capacidad>1] get() }
+        Normal -> Normal { [(self.capacidad>1) and (self.piezas->size()>1)] get() }
+        Normal -> Empty { [self.piezas->size()=1] get() }
+    end
+end
+
+---------- Fin Maquina de estados ---------------
 
 -------------------Invariantes--------------------
 constraints
 context Ciudad
-  -- (1) Cada ciudad está separada al menos 5Km una de otra 👌
+  -- (1) Cada ciudad está separada al menos 5Km una de otra 
   inv CiudadesAlMenos5Km :
     self.recorrido->select(
       r | r.distancia < 5).size() = 0
 
 context Recorrido
-  -- (3) El coche realiza un recorrido siempre entre dos ciudades distintas 👌
+  -- (3) El coche realiza un recorrido siempre entre dos ciudades distintas 
   inv CiudadOrigenDistintaCiuddadDestino : 
     Recorrido.allInstances()->forAll(c1, c2 | c1 <> c2 implies c1.nombre <> c2.nombre)
     
 context Revision
-  -- (4) Todas las revisiones deben tener lugar después de que el coche se matricule 👌
+  -- (4) Todas las revisiones deben tener lugar después de que el coche se matricule 
   inv RevisionDespuesDeMatriculacion :
     Revision.allInstances()->forAll(r | r.fechaInicio > r.coche.fechaMatriculacion)
 
 context Coche 
-  -- (5) Un coche se debe someter a una revisión, como máximo, en un momento dado. 👌
+  -- (5) Un coche se debe someter a una revisión, como máximo, en un momento dado. 
   inv CocheSoloUnaRevisionAlMismoTiempo :
     self.revision->select(r1, r2 | r1.fechaInicio < r2.fechaInicio and r1.fechaFin > r2.fechaInicio).size() = 0
   
@@ -244,6 +279,10 @@ context Coche
     self.viajeEnCurso implies self.viaje->sortedBy(v | v.fechaSalida)->last().fechaLlegada = null
   
   --? INVARIANTE 9 HACER CUANDO HAYA MAQUINA DE ESTADOS
+  inv CocheViajandoOEnCiudad :
+    self.viajeEnCurso implies self.cocheEnCiudad = null
+    else
+      self.cocheEnCiudad != null 
   
   -- (10/12) Si el coche ha completado al menos un viaje y no se encuentra viajando, entonces debe encontrarse en la ciudad a la que llegó en su último viaje
   inv CocheEnCiudadDelUltViaje : --! Hay que revisar para hacerlo con el estado
@@ -251,7 +290,7 @@ context Coche
     in
     let ultimo_recorrido = self.viaje->sortedBy(v | v.fechaSalida)->last()
     in
-    (al_menos_un_viaje and not self.viajeEnCurso implies self.cocheEnCiudad.nombre = ultimo_recorrido.ciudad2.nombre)
+    (al_menos_un_viaje and not self.viajeEnCurso implies self.cocheEnCiudad.nombre = ultimo_recorrido.recorrido.ciudad2.nombre)
     or
     (not al_menos_un_viaje and not self.viajeEnCurso implies self.cocheEnCiudad != null) 
       
@@ -264,152 +303,5 @@ context Coche
     --let al_menos_un_viaje = self.viaje->select(v | v.fechaLlegada != null)->notEmpty()
     --in
     --let ultimo_recorrido = self.viaje->sortedBy(v | v.fechaSalida)->last()
-    --in
+    --in¡
     --(al_menos_un_viaje and not self.viajeEnCurso implies self.cocheEnCiudad.nombre = ultimo_recorrido.ciudad2.nombre)
-    
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    

@@ -1,0 +1,19 @@
+reset 
+!new Ciudad('Malaga')
+!Malaga.nombre := 'Malaga'
+
+!new Ciudad('Granada')
+!Granada.nombre := 'Granada'
+
+!new Ciudad('Sevilla')
+!Sevilla.nombre := 'Sevilla'
+
+!new Recorrido('Malaga-Sevilla')
+!Malaga-Sevilla.distancia := 210
+
+!new Recorrido('Sevilla-Granada')
+!Malaga-Sevilla.distancia := 250
+
+!insert(Malaga, Sevilla) into Malaga-Sevilla
+
+!insert(Sevilla, Granaada) into Sevilla-Granada
