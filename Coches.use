@@ -210,16 +210,12 @@ context Ciudad
 context Recorrido
   -- (3) El coche realiza un recorrido siempre entre dos ciudades distintas 👌
   inv CiudadOrigenDistintaCiuddadDestino : 
-    Recorrido.allInstances()->forAll(
-      c1, c2 | c1 <> c2 implies c1.nombre <> c2.nombre
-    )
+    Recorrido.allInstances()->forAll(c1, c2 | c1 <> c2 implies c1.nombre <> c2.nombre)
     
 context Revision
   -- (4) Todas las revisiones deben tener lugar después de que el coche se matricule 👌
   inv RevisionDespuesDeMatriculacion :
-    Revision.allInstances()->forAll(
-      r | r.fechaInicio > r.coche.fechaMatriculacion 
-    )
+    Revision.allInstances()->forAll(r | r.fechaInicio > r.coche.fechaMatriculacion)
 
 context Coche 
   -- (5) Un coche se debe someter a una revisión, como máximo, en un momento dado. 👌
