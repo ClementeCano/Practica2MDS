@@ -1,0 +1,21 @@
+reset 
+!new Ciudad('Malaga')
+!Malaga.nombre := 'Malaga'
+!new Ciudad('Sevilla')
+!Sevilla.nombre := 'Sevilla'
+
+!new Viaje('Viaje1')
+!Viaje1.fechaSalida := 1
+!Viaje1.fechaLlegada := 5
+
+!new Coche('Coche1')
+!Coche1.fechaMatriculacion := 0
+
+
+
+
+
+
+
+!insert(Malaga,Sevilla) into Recorrido --Recorrido1 --!REVISAR RELACION RECORRIDO (CLASE DE ASOCIACION)
+!insert(Viaje1,Coche1) into Viajar --Viaje1
