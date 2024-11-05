@@ -268,7 +268,7 @@ context Coche
   -- (16) Si un coche necesita mantenimiento, entonces la fecha de matriculación del coche debe superar los 400 días y la fecha de fin de la última revisión de mantenimiento más 100 días debe ser menor que la fecha actual
   inv CocheNecesitaMantenimiento :
     self.necesitaMantenimiento = true implies
-      (self.clock.NOW - self.fechaMatriculacion > 400) and (self.clock.NOW - (self.revision->select(r | r.tipoRevision = 'Mantenimiento')->sortedBy(r | r.fechaFin)->last()).fechaFin > 100) --? Comprobar el .fechaFin
+      (self.clock.NOW - self.fechaMatriculacion > 400) and (self.clock.NOW - (self.revision->select(r | r.tipoRevision = TipoRevision::Mantenimiento)->sortedBy(r | r.fechaFin)->last()).fechaFin > 100) --? Comprobar el .fechaFin
 
   context Clock
   -- Sólo puede haber un reloj en el sistema
