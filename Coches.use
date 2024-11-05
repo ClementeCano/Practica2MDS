@@ -11,16 +11,16 @@ class Clock  -- Este es el modelado del tiempo siempre en todos los modelos
   operations
     tick() 
       begin
-        self.NOW := self.NOW + self.resolution
+        self.NOW := self.NOW + self.resolution;
         for o in self.ao do
-          o.tick()
-        end
+          o.tick();
+        end;
       end
     run (n:Integer)
       begin
         for i in Sequence{1..n} do
-          self.tick()
-        end
+          self.tick();
+        end;
       end
 end
 
@@ -42,86 +42,88 @@ end
 
 class Coche < ActiveObject
 attributes
-  matricula: String
-  marca: String
-  fechaMatriculacion : Integer
-  kilometrosRecorridos : Integer derive --Atributo detivado -> Suma de los kilometros recorridos en todos los viajes. Se actualiza solo
-    self.viaje->select(v | v.fechaLlegada != null).recorrido->sum(r | r.distancia)
-  tieneGarantia : Boolean derive -- Representa si el coche esta en garantia o no
-    (Clock.NOW - self.fechaMatriculacion < 400) or 
+  matricula: String;
+  marca: String;
+  fechaMatriculacion : Integer;
+  kilometrosRecorridos : Integer derive: --Atributo detivado -> Suma de los kilometros recorridos en todos los viajes. Se actualiza solo
+    self.viaje->select(v | v.fechaLlegada <> null)->collect(v | v.recorrido.distancia)->sum()
+  tieneGarantia : Boolean derive: -- Representa si el coche esta en garantia o no
+    (self.clock.NOW - self.fechaMatriculacion < 400) or 
       (self.revision->select(r | r.taller = TallerOficial)->sortedBy(r | r.fechaFin)->last().garantia + 
-        self.revision->select(r | r.taller = TallerOficial)->sortedBy(r | r.fechaFin)->last().fechaFin > Clock.NOW)
-  necesitaMantenimiento : Boolean derive -- Representa si el coche necesita mantenimiento o no
-    (Clock.NOW - self.fechaMatriculacion > 400) and (Clock.NOW - (self.revision->select(r | r.tipo = 'Mantenimiento')->sortedBy(r | r.fechaFin)->last()).fechaFin > 100) --? Comprobar el .fechaFin
-  kilometrosViaje : Integer
-  velocidad : Integer
+        self.revision->select(r | r.taller = TallerOficial)->sortedBy(r | r.fechaFin)->last().fechaFin > self.clock.NOW)
+  necesitaMantenimiento : Boolean derive: -- Representa si el coche necesita mantenimiento o no
+    (self.clock.NOW - self.fechaMatriculacion > 400) and (self.clock.NOW - (self.revision->select(r | r.tipo = 'Mantenimiento')->sortedBy(r | r.fechaFin)->last()).fechaFin > 100) --? Comprobar el .fechaFin
+  kilometrosViaje : Integer;
+  velocidad : Integer;
 
 -- recorrido y viaje en curso lo hemos eliminado, cuidado en las invariantes
 -- necesitaMantenimiento y tieneGarantia le cambiemos el nombre
 
   operations
-  viaje(r:Recorrido)
+  viaje(r: Recorrido)
     begin
-      declare v:Viaje;
-
-      self.kilometrosViaje := 0
+      declare v: Viaje;
+      v := new Viaje;
+      self.kilometrosViaje := 0;
       
-      v.fechaInicio = Clock.NOW
+      v.fechaSalida:= self.clock.NOW;
       insert(self, v) into Viajar;
-      insert(r, v) into RecorridoDelViaje;
+      insert(v, r) into RecorridoDelViaje;
 
-      if self.cochesEnCiudad != null then
-        delete(self, self.cochesEnCiudad) from UbicacionCoche;
+      if self.cochesEnCiudad <> null then
+        delete(self.cochesEnCiudad, self) from UbicacionCoche;
       end;
     end
     
-    pre: self.viaje -> select(via| via.fechaLlegada = null) -> Empty()
+    pre: self.viaje -> select(via| via.fechaLlegada = null) -> size() = 0
     post: self.kilometrosViaje = 0
-          and self.recorridoEnCurso <> null
-
+  
 
   avanzar()
     begin
-      declare viaje: self.viaje -> select(v | v.fechaLlegada = null) --viaje que estamos haciendo
-      declare viajeMod: viaje.fechaLlegada := Clock.NOW --viaje con la fecha de llegada modificada
-      declare distancia: viaje.recorrido.distancia
+      declare viaje:Viaje, viajeMod: Viaje, distancia:Integer;
+      viaje:= self.viaje -> select(v | v.fechaLlegada = null) -> asSequence() -> last();
+      viajeMod := viaje;
+      viajeMod.fechaLlegada := self.clock.NOW; 
+      distancia:= viaje.recorrido.distancia;
 
       if self.kilometrosViaje + self.velocidad >= distancia then
-        self.kilometrosRecorridos := self.kilometrosRecorridos + (distancia - self.kilometrosViaje)
-        self.kilometrosViaje := distancia
+        self.kilometrosRecorridos := self.kilometrosRecorridos + (distancia - self.kilometrosViaje);
+        self.kilometrosViaje := distancia;
 
 
         delete(self, viaje) from Viajar;
         insert(self, viajeMod) into Viajar;
 
-        delete(viaje.recorrido, viaje) from RecorridoDelViaje;
-        insert(viaje.recorrido, viajeMod) into RecorridoDelViaje;
+        delete(viaje, viaje.recorrido) from RecorridoDelViaje;
+        insert(viaje, viajeMod.recorrido) into RecorridoDelViaje;
 
-        insert(self, viaje.recorrido.ciudad2) into UbicacionCoche;
-        
+        insert(viaje.recorrido.ciudad2, self) into UbicacionCoche;
       else
-        self.kilometrosViaje := self.kilometrosViaje + self.velocidad
-        self.kilometrosRecorridos := self.kilometrosRecorridos + self.velocidad
+        self.kilometrosViaje := self.kilometrosViaje + self.velocidad;
+        self.kilometrosRecorridos := self.kilometrosRecorridos + self.velocidad;
       end;
     end
 
-    pre: self.kilometrosViaje < distancia --llevar menos tiempo de viaje que la distancia del viaje
+    pre: self.kilometrosViaje <  self.viaje -> select(v | v.fechaLlegada = null) -> asSequence() -> last().recorrido.distancia --llevar menos tiempo de viaje que la distancia del viaje
     post: self.kilometrosViaje = self.kilometrosViaje@pre + self.velocidad 
-          or self.kilometrosViaje = distancia 
+          or self.kilometrosViaje = self.viaje -> select(v | v.fechaLlegada = null) -> asSequence() -> last().recorrido.distancia 
 
   tick()
-    declare viajeEnCurso: self.viaje -> select(v| v.fechaLlegada = null)
     begin
-      if viajeEnCurso then 
-        self.avanzar()
+      declare viajeEnCurso: Viaje;
+      viajeEnCurso := self.viaje -> select(v| v.fechaLlegada = null) -> asSequence() -> last();
+      if exist(viajeEnCurso) then 
+        self.avanzar();
       end;
+    end
 end
 
 class Revision
 attributes
   fechaInicio: Integer
   fechaFin: Integer
-  tipoRevision : TipoRevision
+  tipoRevision: TipoRevision
 
 end
 
@@ -173,7 +175,7 @@ association TallerDeRevision between
 end
 
 association RecorridoDelViaje between
-  Viaje[*] roles viajes
+  Viaje[*] role viajes
   Recorrido[1] role recorrido
 end
 
@@ -184,9 +186,9 @@ end
 associationclass Recorrido between
   Ciudad [*] role ciudad1
   Ciudad [*] role ciudad2
-attributes
-  distancia: Integer
-
+  attributes
+    distancia: Integer
+end
 ----------Fin Clase de Asociaciones---------------
 
 -------------------Invariantes--------------------
@@ -213,7 +215,7 @@ context Coche
   
   --! (7) Si un coche está siendo sometido a una revisión, entonces el coche debe encontrarse en la misma ciudad donde está el taller.   CREO QUE YA ESTA BIEN REVISAR
   inv CocheEnCiudadDelTaller : 
-      let tallerCoche = self.revision->select(r | r.fechaInicio <= Clock.NOW and r.fechaFin > Clock.NOW).taller
+      let tallerCoche = self.revision->select(r | r.fechaInicio <= self.clock.NOW and r.fechaFin > self.clock.NOW).taller
       in
       not exist(tallerCoche) implies true
       or
@@ -257,12 +259,12 @@ context Coche
     let ultima_revision_oficial = self.revision->select(r | r.taller = TallerOficial)->sortedBy(r | r.fechaFin)->last()
     in
     self.tieneGarantia = true implies 
-      (Clock.NOW - self.fechaMatriculacion < 400) or (ultima_revision_oficial.taller.garantia + ultima_revision_oficial.fechaFin > Clock.NOW)
+      (self.clock.NOW - self.fechaMatriculacion < 400) or (ultima_revision_oficial.taller.garantia + ultima_revision_oficial.fechaFin > self.clock.NOW)
   
   -- (16) Si un coche necesita mantenimiento, entonces la fecha de matriculación del coche debe superar los 400 días y la fecha de fin de la última revisión de mantenimiento más 100 días debe ser menor que la fecha actual
   inv CocheNecesitaMantenimiento :
     self.necesitaMantenimiento = true implies
-      (Clock.NOW - self.fechaMatriculacion > 400) and (Clock.NOW - (self.revision->select(r | r.tipo = 'Mantenimiento')->sortedBy(r | r.fechaFin)->last()).fechaFin > 100) --? Comprobar el .fechaFin
+      (self.clock.NOW - self.fechaMatriculacion > 400) and (self.clock.NOW - (self.revision->select(r | r.tipo = 'Mantenimiento')->sortedBy(r | r.fechaFin)->last()).fechaFin > 100) --? Comprobar el .fechaFin
 
 
   context Clock
