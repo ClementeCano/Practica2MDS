@@ -57,6 +57,7 @@ attributes
   velocidad : Integer
 
 -- recorrido y viaje en curso lo hemos eliminado, cuidado en las invariantes
+-- necesitaMantenimiento y tieneGarantia le cambiemos el nombre
 
   operations
   viaje(r:Recorrido)
@@ -74,7 +75,7 @@ attributes
       end;
     end
     
-    pre: (self.viaje -> select(viaje| viaje.fechaLlegada = null)) -> Empty()
+    pre: self.viaje -> select(via| via.fechaLlegada = null) -> Empty()
     post: self.kilometrosViaje = 0
           and self.recorridoEnCurso <> null
 
@@ -88,9 +89,8 @@ attributes
       if self.kilometrosViaje + self.velocidad >= distancia then
         self.kilometrosRecorridos := self.kilometrosRecorridos + (distancia - self.kilometrosViaje)
         self.kilometrosViaje := distancia
-        
 
-        
+
         delete(self, viaje) from Viajar;
         insert(self, viajeMod) into Viajar;
 
@@ -99,9 +99,7 @@ attributes
 
         insert(self, viaje.recorrido.ciudad2) into UbicacionCoche;
         
-      end;
-
-      else then
+      else
         self.kilometrosViaje := self.kilometrosViaje + self.velocidad
         self.kilometrosRecorridos := self.kilometrosRecorridos + self.velocidad
       end;
@@ -196,8 +194,7 @@ constraints
 context Ciudad
   -- (1) Cada ciudad está separada al menos 5Km una de otra 
   inv CiudadesAlMenos5Km :
-    self.recorrido->select(
-      r | r.distancia < 5).size() = 0
+    self.recorrido->select(r | r.distancia < 5).size() = 0
 
 context Recorrido
   -- (3) El coche realiza un recorrido siempre entre dos ciudades distintas 
@@ -214,22 +211,15 @@ context Coche
   inv CocheSoloUnaRevisionAlMismoTiempo :
     self.revision->select(r1, r2 | r1.fechaInicio < r2.fechaInicio and r1.fechaFin > r2.fechaInicio).size() = 0
   
-  --! (7) Si un coche está siendo sometido a una revisión, entonces el coche debe encontrarse en la misma ciudad donde está el taller.   CAMBIAR INVARIANTE
+  --! (7) Si un coche está siendo sometido a una revisión, entonces el coche debe encontrarse en la misma ciudad donde está el taller.   CREO QUE YA ESTA BIEN REVISAR
   inv CocheEnCiudadDelTaller : 
       let tallerCoche = self.revision->select(r | r.fechaInicio <= Clock.NOW and r.fechaFin > Clock.NOW).taller
       in
-      type(tallerCoche) = TallerOficial implies
-        tallerCoche.ciudadOficial.nombre = self.cochesEnCiudad.nombre
-      else --! ELSE SIN IF
-        tallerCoche.ciudadNoOficial.nombre = self.cochesEnCiudad.nombre
-  end
-
-      --? OTRA VERSIÓN QUE HACE QUE EL CODIGO NO SE MUESTRE RARO (NO UTILIZA LET)--
-  -- (7) Si un coche está siendo sometido a una revisión, entonces el coche debe encontrarse en la misma ciudad donde está el taller.
-  --inv CocheEnCiudadDelTaller : 
-  --  self.revision->select(r | r.fechaInicio <= Clock.NOW and r.fechaFin > Clock.NOW)->forAll(r | 
-  --   r.taller.ciudadOficial.nombre = self.viaje->select(v | v.fechaLlegada = null).recorrido.ciudad1.nombre)
-      --?----------------------------------------------------------
+      not exist(tallerCoche) implies true
+      or
+      type(tallerCoche) = TallerOficial implies tallerCoche.ciudadOficial = self.cochesEnCiudad
+      or
+      type(tallerCoche) <> TallerOficial implies tallerCoche.ciudadNoOficial = self.cochesEnCiudad
 
   -- (8) Si el coche está realizando actualmente algún viaje, dicho viaje únicamente tendrá fecha de salida, pero no de llegada.  
   inv CocheEnViajeSinFechaLlegada :
@@ -237,13 +227,14 @@ context Coche
     in
     viajeEnCurso implies self.viaje->sortedBy(v | v.fechaSalida)->last().fechaLlegada = null
   
-  --! (9) Un coche se encontrará en todo momento bien realizando un viaje determinado o bien en una ciudad.   CAMBIAR INVARIANTE
+  -- (9) Un coche se encontrará en todo momento bien realizando un viaje determinado o bien en una ciudad.
   inv CocheViajandoOEnCiudad :
     let viajeEnCurso = (self.viaje -> select(v | v.fechaSalida = null)) = 1
     in
-    viajeEnCurso implies self.cocheEnCiudad = null
-    else --! ELSE SIN IF
-      self.cocheEnCiudad <> null 
+    (viajeEnCurso implies self.cocheEnCiudad = null)
+    or
+    (not viajeEnCurso implies self.cocheEnCiudad <> null)
+   
   
   -- (10/12) Si el coche ha completado al menos un viaje y no se encuentra viajando, entonces debe encontrarse en la ciudad a la que llegó en su último viaje
   inv CocheEnCiudadDelUltViaje : 
@@ -261,10 +252,21 @@ context Coche
   inv CocheNoPuedeRealizarDosViajes :
     self.viaje->select(v | v.fechaLlegada = null).size() <= 1
   
-  --! Acabar
-  inv CocheTieneGarantia
+  -- (15) Si un coche está en garantía, entonces la fecha de matriculación del coche no puede superar los 400 días o la fecha de fin de la última revisión oficial más la garantía del taller oficial debe ser mayor que la fecha actual
+  inv CocheTieneGarantia :
+    let ultima_revision_oficial = self.revision->select(r | r.taller = TallerOficial)->sortedBy(r | r.fechaFin)->last()
+    in
+    self.tieneGarantia = true implies 
+      (Clock.NOW - self.fechaMatriculacion < 400) or (ultima_revision_oficial.taller.garantia + ultima_revision_oficial.fechaFin > Clock.NOW)
   
+  -- (16) Si un coche necesita mantenimiento, entonces la fecha de matriculación del coche debe superar los 400 días y la fecha de fin de la última revisión de mantenimiento más 100 días debe ser menor que la fecha actual
+  inv CocheNecesitaMantenimiento :
+    self.necesitaMantenimiento = true implies
+      (Clock.NOW - self.fechaMatriculacion > 400) and (Clock.NOW - (self.revision->select(r | r.tipo = 'Mantenimiento')->sortedBy(r | r.fechaFin)->last()).fechaFin > 100) --? Comprobar el .fechaFin
+
+
   context Clock
   -- Sólo puede haber un reloj en el sistema
   inv UnSoloReloj:
     Clock.allInstances() -> size() = 1
+
