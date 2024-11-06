@@ -11,6 +11,9 @@ reset
 !new Coche('Coche2')  --Coche2
 !Coche2.fechaMatriculacion := 0
 
+!new Coche('Coche3')  --Coche3
+!Coche3.fechaMatriculacion := 0
+
 !new Revision('Revision1')  --Revision1
 !Revision1.fechaInicio := 5
 !Revision1.fechaFin := 10
@@ -48,10 +51,8 @@ reset
 --Invariante 5
 !insert(Coche1, Revision2) into RevisionCoche --RevisionCoche2
 
---Invariante 7
---!insert(Malaga, Taller1) into TallerOficialEnCiudad --TallerOficialEnCiudad1
---!insert(Malaga, Coche1) into UbicacionCoche --UbicacionCoche1
---!insert(Taller1, Revision1) into TallerDeRevision --RevisionEnTallerOficial1
+
+--No se puede probar invariante 7
 
 --Invariante 8
 !insert(Coche2, Viaje1) into Viajar --Viajar1
@@ -61,6 +62,12 @@ reset
 
 
 -- Invariante 10
---!insert(Coche3, Viaje2) into Viajar --Viajar2
---!insert(Viaje2, Recorrido1) into RecorridoDelViaje --RecorridoDelViaje1
---!insert(Sevilla, Coche3) into UbicacionCoche --UbicacionCoche2
+!insert(Viaje2, Recorrido1) into RecorridoDelViaje --RecorridoDelViaje1
+!insert(Coche3, Viaje2) into Viajar --Viajar2
+!insert(Sevilla, Coche3) into UbicacionCoche --UbicacionCoche2
+
+--No tiene sentido probar invariante 11
+
+--No se puede probar invariante 15
+
+--No se puede probar invariante 16

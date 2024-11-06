@@ -13,6 +13,14 @@ reset
 !Viaje2.fechaSalida := 2
 !Viaje2.fechaLlegada := 15
 
+!new Viaje('Viaje3') --Viaje3
+!Viaje3.fechaSalida := 2
+!Viaje3.fechaLlegada := null
+
+!new Viaje('Viaje4') --Viaje4
+!Viaje4.fechaSalida := 9
+!Viaje4.fechaLlegada := null
+
 !new Coche('Coche1')
 !Coche1.fechaMatriculacion := 4
 
@@ -63,4 +71,17 @@ reset
 
 --Contraejemplo Invariante 9
 --El coche 3 no está haciedo ningún viaje ni está en ninguna ciudad
+
+--Contraejemplo Invariante 10
+!insert(Viaje2, Recorrido1) into RecorridoDelViaje --RecorridoDelViaje1
+!insert(Coche3, Viaje2) into Viajar --Viajar2
+!insert(Malaga, Coche3) into UbicacionCoche --UbicacionCoche2
+
+--Contraejemplo Invariante 11
+!insert(Coche2, Viaje3) into Viajar --Viajar1
+!insert(Coche2, Viaje4) into Viajar --Viajar3
+
+--No se puede probar invariante 15
+
+--No se puede probar invariante 16
 

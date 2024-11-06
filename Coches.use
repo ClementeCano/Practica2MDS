@@ -236,15 +236,13 @@ context Coche
   
   -- (10/12) Si el coche ha completado al menos un viaje y no se encuentra viajando, entonces debe encontrarse en la ciudad a la que llegó en su último viaje
   inv CocheEnCiudadDelUltViaje : 
-    let al_menos_un_viaje = self.viaje->select(v | v.fechaLlegada <> null)->notEmpty()
+    let al_menos_un_viaje = self.viaje->select(v | v.fechaLlegada <> null)->notEmpty() 
     in
     let ultimo_recorrido = self.viaje->sortedBy(v | v.fechaSalida)->last()
     in
-    let viajeEnCurso = (self.viaje -> select(v | v.fechaSalida = null)) -> size() = 1
+    let viajeEnCurso = (self.viaje -> select(v | v.fechaLlegada = null)) -> size() = 1
     in
     (al_menos_un_viaje and not viajeEnCurso implies self.cochesEnCiudad = ultimo_recorrido.recorrido.ciudad2)
-    or
-    (not al_menos_un_viaje and not viajeEnCurso implies self.cochesEnCiudad <> null)
     
 -- (11) Un coche no puede realizar dos viajes a la vez
   inv CocheNoPuedeRealizarDosViajes :
