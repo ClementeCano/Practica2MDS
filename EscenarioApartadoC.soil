@@ -1,3 +1,4 @@
+-- Modelo de objetos apartado c
 reset 
 
 !new Clock('Clock')

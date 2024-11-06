@@ -210,7 +210,7 @@ context Coche
   inv CocheSoloUnaRevisionAlMismoTiempo:
     self.revision->forAll(r1, r2 | r1 <> r2 implies (r1.fechaFin <= r2.fechaInicio or r2.fechaFin <= r1.fechaInicio))
 
-  -- (7-b) Si un coche está siendo sometido a una revisión, entonces el coche debe encontrarse en la misma ciudad donde está el taller.
+  -- (7) Si un coche está siendo sometido a una revisión, entonces el coche debe encontrarse en la misma ciudad donde está el taller.
   inv CocheEnCiudadDelTaller:
     let revisionActual = self.revision->select(r | r.fechaInicio <= self.clock.NOW and r.fechaFin > self.clock.NOW)
     in
@@ -252,12 +252,12 @@ context Coche
   inv CocheTieneGarantia :
     let ultima_revision_oficial = self.revision->select(r | r.taller.oclIsTypeOf(TallerOficial))->sortedBy(r | r.fechaFin)->last()
     in
-    self.tieneGarantia = true implies 
+    self.tieneGarantia implies 
       (self.clock.NOW - self.fechaMatriculacion < 400) or (ultima_revision_oficial.taller.oclAsType(TallerOficial).garantia + ultima_revision_oficial.fechaFin > self.clock.NOW)
   
-  -- (16) Si un coche necesita mantenimiento, entonces la fecha de matriculación del coche debe superar los 400 días y la fecha de fin de la última revisión de mantenimiento más 100 días debe ser menor que la fecha actual
+  -- (16) Si un coche necesita mantenimiento, entonces la fecha de matriculación del coche debe superar los 400 días y la fecha de fin de la última revisión de mantenimiento + 100 días debe ser menor que la fecha actual
   inv CocheNecesitaMantenimiento :
-    self.necesitaMantenimiento = true implies
+    self.necesitaMantenimiento implies
       (self.clock.NOW - self.fechaMatriculacion > 400) and (self.clock.NOW - (self.revision->select(r | r.tipoRevision = TipoRevision::Mantenimiento)->sortedBy(r | r.fechaFin)->last()).fechaFin > 100) --? Comprobar el .fechaFin
 
   context Clock

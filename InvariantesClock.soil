@@ -1,0 +1,40 @@
+reset
+
+!new Clock('Clock')
+
+
+!new Ciudad('Moclinejo')
+!Moclinejo.nombre := 'Moclinejo'
+
+!new Coche('Coche1')
+!Coche1.fechaMatriculacion:= 0
+
+!insert (Clock, Coche1) into Time
+
+!new TallerOficial('TallerOf1')
+!TallerOf1.garantia:= 80
+
+!new TallerNoOficial('TallerNoOf1')
+
+!new Revision('Revision1')  --Revision1
+!Revision1.fechaInicio := 5
+!Revision1.fechaFin := 13
+!Revision1.tipoRevision := TipoRevision::Reparacion
+
+!new Revision('Revision2') --Revision2
+!Revision2.fechaInicio := 401
+!Revision2.fechaFin := 410
+!Revision2.tipoRevision := TipoRevision::Mantenimiento
+
+--Invariante 7
+!insert (Moclinejo, TallerOf1) into TallerOficialEnCiudad
+!insert (TallerOf1, Revision1) into TallerDeRevision
+!insert (Coche1,Revision1) into RevisionCoche
+!insert (Moclinejo,Coche1) into UbicacionCoche
+
+--Invariante 15/16
+!insert (TallerOf1, Revision2) into TallerDeRevision
+!insert (Coche1,Revision2) into RevisionCoche
+
+
+
