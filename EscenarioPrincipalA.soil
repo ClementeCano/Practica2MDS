@@ -4,19 +4,63 @@ reset
 !new Ciudad('Sevilla')
 !Sevilla.nombre := 'Sevilla'
 
-!new Viaje('Viaje1')
-!Viaje1.fechaSalida := 1
-!Viaje1.fechaLlegada := 5
 
 !new Coche('Coche1')
 !Coche1.fechaMatriculacion := 0
 
+!new Coche('Coche2')  --Coche2
+!Coche2.fechaMatriculacion := 0
+
+!new Revision('Revision1')  --Revision1
+!Revision1.fechaInicio := 5
+!Revision1.fechaFin := 10
+!Revision1.tipoRevision := TipoRevision::Reparacion
+
+!new Revision('Revision2')  --Revision2
+!Revision2.fechaInicio := 15
+!Revision2.fechaFin := 17
+!Revision2.tipoRevision := TipoRevision::Reparacion
+
+
+!new TallerOficial('Taller1') --Taller1
+!Taller1.garantia := 10
+
+
+!new Viaje('Viaje1') --Viaje1
+!Viaje1.fechaSalida := 2
+!Viaje1.fechaLlegada := null
+
+!new Viaje('Viaje2') --Viaje2
+!Viaje2.fechaSalida := 2
+!Viaje2.fechaLlegada := 10
 
 
 
 
+--Invariante 1, 3
+!insert(Malaga,Sevilla) into Recorrido --Recorrido1 
+!Recorrido1.distancia := 10 
 
 
-!insert(Malaga,Sevilla) into Recorrido --Recorrido1 --!REVISAR RELACION RECORRIDO (CLASE DE ASOCIACION)
-!insert(Viaje1,Coche1) into Viajar --Viaje1
+--Invariante 4
+!insert(Coche1, Revision1) into RevisionCoche --RevisionCoche1
 
+--Invariante 5
+!insert(Coche1, Revision2) into RevisionCoche --RevisionCoche2
+
+--Invariante 7
+--!insert(Malaga, Taller1) into TallerOficialEnCiudad --TallerOficialEnCiudad1
+--!insert(Malaga, Coche1) into UbicacionCoche --UbicacionCoche1
+--!insert(Taller1, Revision1) into TallerDeRevision --RevisionEnTallerOficial1
+
+--Invariante 8
+!insert(Coche2, Viaje1) into Viajar --Viajar1
+
+--Invariante 9
+!insert(Malaga, Coche1) into UbicacionCoche --UbicacionCoche1
+
+
+-- Invariante 10
+--!insert(Coche3, Viaje2) into Viajar --Viajar2
+--!insert(Viaje2, Recorrido1) into RecorridoDelViaje --RecorridoDelViaje1
+--!insert(Sevilla, Coche3) into UbicacionCoche --UbicacionCoche2

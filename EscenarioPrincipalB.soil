@@ -1,4 +1,7 @@
 reset 
+
+!new Clock('Clock')
+
 !new Ciudad('Malaga')
 !Malaga.nombre := 'Malaga'
 
@@ -8,12 +11,36 @@ reset
 !new Ciudad('Sevilla')
 !Sevilla.nombre := 'Sevilla'
 
-!new Recorrido('Malaga-Sevilla')
-!Malaga-Sevilla.distancia := 210
+!new Coche('Coche1')
+!Coche1.fechaMatriculacion := 0
+!Coche1.velocidad := 27
 
-!new Recorrido('Sevilla-Granada')
-!Malaga-Sevilla.distancia := 250
+!insert (Clock, Coche1) into Time
 
-!insert(Malaga, Sevilla) into Malaga-Sevilla
+!insert(Malaga, Coche1) into UbicacionCoche;
 
-!insert(Sevilla, Granaada) into Sevilla-Granada
+!insert(Malaga, Sevilla) into Recorrido --Recorrido1
+!Recorrido1.distancia := 210
+
+!insert(Sevilla, Granada) into Recorrido --Recorrido2
+!Recorrido2.distancia := 250
+
+!Clock.run(5)
+
+?Clock.NOW
+
+!Coche1.viaje(Recorrido1)
+
+-- Como el coche viaja a velocidad 27, tardará 8 dias en llegar a Sevilla
+!Clock.run(8)
+?Coche1.kilometrosRecorridos
+?Coche1.kilometrosViaje
+
+!Coche1.viaje(Recorrido2)
+
+-- Para llegar a Granada, tardará otros 10 dias en llegar
+!Clock.run(10)
+?Coche1.kilometrosRecorridos
+?Coche1.kilometrosViaje
+
+?Clock.NOW

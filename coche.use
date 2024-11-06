@@ -13,7 +13,7 @@ class Clock  -- Este es el modelado del tiempo siempre en todos los modelos
       begin
         self.NOW := self.NOW + self.resolution;
         for o in self.ao do
-          o.action();
+          o.tick();
         end;
       end
     run (n:Integer)
@@ -26,7 +26,7 @@ end
 
 abstract class ActiveObject -- real-time objects (Todos los objetos que variarán con el tiempo)
   operations
-    action() begin end
+    tick() begin end
 end
 
 class Ciudad
@@ -45,8 +45,8 @@ attributes
   matricula: String
   marca: String
   fechaMatriculacion : Integer
-  kilometrosRecorridos : Integer derive: --Atributo derivado -> Suma de los kilometros recorridos en todos los viajes. Se actualiza solo
-    self.viaje -> select(v | v.fechaLlegada <> null)->collect(v | v.recorrido.distancia)->sum()
+  kilometrosRecorridos : Integer derive: --Atributo detivado -> Suma de los kilometros recorridos en todos los viajes. Se actualiza solo
+    self.viaje->select(v | v.fechaLlegada <> null)->collect(v | v.recorrido.distancia)->sum()
   tieneGarantia : Boolean derive: -- Representa si el coche esta en garantia o no
     (self.clock.NOW - self.fechaMatriculacion < 400) or 
       (
@@ -81,35 +81,43 @@ attributes
     end
     
     pre: self.viaje -> select(via| via.fechaLlegada = null) -> size() = 0
-    post: self.kilometrosViaje = 0 and self.cochesEnCiudad.oclIsUndefined()
+    post: self.kilometrosViaje = 0
   
 
   avanzar()
     begin
-      declare viaje:Viaje, distancia:Integer;
-      viaje:= self.viaje -> select(v | v.fechaLlegada = null) -> asSequence() -> last(); 
+      declare viaje:Viaje, viajeMod: Viaje, distancia:Integer;
+      viaje:= self.viaje -> select(v | v.fechaLlegada = null) -> asSequence() -> last();
+      viajeMod := viaje;
+      viajeMod.fechaLlegada := self.clock.NOW; 
       distancia:= viaje.recorrido.distancia;
 
       if self.kilometrosViaje + self.velocidad >= distancia then
-        
+        self.kilometrosRecorridos := self.kilometrosRecorridos + (distancia - self.kilometrosViaje);
         self.kilometrosViaje := distancia;
-        viaje.fechaLlegada := self.clock.NOW;
+
+
+        delete(self, viaje) from Viajar;
+        insert(self, viajeMod) into Viajar;
+
+        delete(viaje, viaje.recorrido) from RecorridoDelViaje;
+        insert(viaje, viajeMod.recorrido) into RecorridoDelViaje;
 
         insert(viaje.recorrido.ciudad2, self) into UbicacionCoche;
-        
       else
-        self.kilometrosViaje := self.kilometrosViaje + self.velocidad*self.clock.resolution;
+        self.kilometrosViaje := self.kilometrosViaje + self.velocidad;
+        self.kilometrosRecorridos := self.kilometrosRecorridos + self.velocidad;
       end;
     end
 
     pre: self.kilometrosViaje <  self.viaje -> select(v | v.fechaLlegada = null) -> asSequence() -> last().recorrido.distancia --llevar menos tiempo de viaje que la distancia del viaje
-    post: self.kilometrosViaje = self.kilometrosViaje@pre + self.velocidad*self.clock.resolution 
-          or self.kilometrosViaje = self.viaje -> select(v | v.fechaLlegada@pre = null) -> asSequence() -> last().recorrido.distancia 
+    post: self.kilometrosViaje = self.kilometrosViaje@pre + self.velocidad 
+          or self.kilometrosViaje = self.viaje -> select(v | v.fechaLlegada = null) -> asSequence() -> last().recorrido.distancia 
 
-  action()
+  tick()
     begin
       declare viajeEnCurso: Viaje;
-      viajeEnCurso := self.viaje -> select(v|v.fechaLlegada = null) -> asSequence() -> last();
+      viajeEnCurso := self.viaje -> select(v| v.fechaLlegada = null) -> asSequence() -> last();
       if viajeEnCurso <> null then 
         self.avanzar();
       end;
@@ -196,7 +204,7 @@ context Ciudad
     Recorrido.allInstances -> forAll(r | r.distancia > 5)
 
 context Recorrido
-  -- (3) El coche realiza un recorrido siempre entre dos ciudades distintas 
+  -- (3) El coche realiza un recorrido siempre entre dos ciudades distintas 🥶🥶🥶🥶
   inv CiudadOrigenDistintaCiuddadDestino : 
     Recorrido.allInstances -> forAll(r | r.ciudad1.nombre <> r.ciudad2.nombre)
     
@@ -208,9 +216,11 @@ context Revision
 context Coche 
   -- (5) Un coche se debe someter a una revisión, como máximo, en un momento dado.
   inv CocheSoloUnaRevisionAlMismoTiempo:
-    self.revision->forAll(r1, r2 | r1 <> r2 implies (r1.fechaFin <= r2.fechaInicio or r2.fechaFin <= r1.fechaInicio))
+    self.revision->forAll(r1, r2 |
+      r1 <> r2 implies (r1.fechaFin <= r2.fechaInicio or r2.fechaFin <= r1.fechaInicio)
+    )
 
-  -- (7-b) Si un coche está siendo sometido a una revisión, entonces el coche debe encontrarse en la misma ciudad donde está el taller.
+  --! (7) Si un coche está siendo sometido a una revisión, entonces el coche debe encontrarse en la misma ciudad donde está el taller.   CREO QUE YA ESTA BIEN REVISAR YA FUNCIONAAA
   inv CocheEnCiudadDelTaller:
     let revisionActual = self.revision->select(r | r.fechaInicio <= self.clock.NOW and r.fechaFin > self.clock.NOW)
     in
@@ -223,16 +233,17 @@ context Coche
 
 -- (8) Si el coche está realizando actualmente algún viaje, dicho viaje únicamente tendrá fecha de salida, pero no de llegada.
   inv CocheEnViajeSinFechaLlegada :
-    let viajeEnCurso = (self.viaje -> select(v | v.fechaLlegada = null)) -> size() = 1
+    let viajeEnCurso = (self.viaje -> select(v | v.fechaSalida = null)) -> size() = 1
     in
     viajeEnCurso implies self.viaje->sortedBy(v | v.fechaSalida)->last().fechaLlegada = null
   
   -- (9) Un coche se encontrará en todo momento bien realizando un viaje determinado o bien en una ciudad.
   inv CocheViajandoOEnCiudad :
-    let viajeEnCurso = (self.viaje -> select(v | v.fechaLlegada = null)) -> size() = 1
+    let viajeEnCurso = (self.viaje -> select(v | v.fechaSalida = null)) -> size() = 1
     in
-    (self.cochesEnCiudad <> null or viajeEnCurso)
-
+    (viajeEnCurso implies self.cochesEnCiudad = null)
+    or
+    (not viajeEnCurso implies self.cochesEnCiudad <> null)
   
   -- (10/12) Si el coche ha completado al menos un viaje y no se encuentra viajando, entonces debe encontrarse en la ciudad a la que llegó en su último viaje
   inv CocheEnCiudadDelUltViaje : 
@@ -245,7 +256,6 @@ context Coche
     (al_menos_un_viaje and not viajeEnCurso implies self.cochesEnCiudad = ultimo_recorrido.recorrido.ciudad2)
     or
     (not al_menos_un_viaje and not viajeEnCurso implies self.cochesEnCiudad <> null)
-    
 -- (11) Un coche no puede realizar dos viajes a la vez
   inv CocheNoPuedeRealizarDosViajes :
     self.viaje->select(v | v.fechaLlegada = null) -> size() <= 1

@@ -1,0 +1,66 @@
+reset 
+!new Ciudad('Malaga')
+!Malaga.nombre := 'Malaga'
+
+!new Ciudad('Sevilla')
+!Sevilla.nombre := 'Sevilla'
+
+!new Viaje('Viaje1')
+!Viaje1.fechaSalida := 1
+!Viaje1.fechaLlegada := 5
+
+!new Viaje('Viaje2') --Viaje2
+!Viaje2.fechaSalida := 2
+!Viaje2.fechaLlegada := 15
+
+!new Coche('Coche1')
+!Coche1.fechaMatriculacion := 4
+
+!new Coche('Coche2')  --Coche2
+!Coche2.fechaMatriculacion := 0
+
+!new Coche('Coche3')  --Coche3
+!Coche3.fechaMatriculacion := 0
+
+
+!new Revision('Revision1')
+!Revision1.fechaInicio := 1
+!Revision1.fechaFin := 5
+!Revision1.tipoRevision := TipoRevision::Reparacion
+
+!new Revision('Revision2')
+!Revision2.fechaInicio := 1
+!Revision2.fechaFin := 5
+!Revision2.tipoRevision := TipoRevision::Reparacion
+
+!new TallerOficial('TallerOficial1')
+!TallerOficial1.garantia := 5
+
+
+
+
+--Contraejemplo Invariante 1
+!insert(Malaga,Sevilla) into Recorrido --Recorrido1
+!Recorrido1.distancia := 3 
+
+--Contraejemplo Invariante3
+!insert(Malaga,Malaga) into Recorrido --Recorrido2
+!Recorrido2.distancia := 6
+
+--Contraejemplo Invariante 4
+!insert(Coche1, Revision1) into RevisionCoche
+
+--Contraejemplo Invariante 5
+!insert(Coche1, Revision2) into RevisionCoche
+
+--Contraejemplo Invariante 7
+--!insert(Malaga, TallerOficial1) into TallerOficialEnCiudad --TallerOficialEnCiudad1
+--!insert(Sevilla, Coche1) into UbicacionCoche --UbicacionCoche1
+--!insert(TallerOficial1, Revision1) into TallerDeRevision --RevisionEnTallerOficial1
+
+--No hay Contraejemplo Invariante 8
+--!insert(Coche2, Viaje2) into Viajar --Viajar1
+
+--Contraejemplo Invariante 9
+--El coche 3 no está haciedo ningún viaje ni está en ninguna ciudad
+
